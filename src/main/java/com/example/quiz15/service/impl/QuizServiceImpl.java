@@ -251,8 +251,30 @@ public class QuizServiceImpl implements QuizService {
 		LocalDate endDate = req.getEndDate() == null ? LocalDate.of(2999, 12, 31) //
 				: req.getEndDate();
 
-		List<Quiz> list = quizDao.getAll(quizName, startDate, endDate);
+		List<Quiz> list = new ArrayList<>();
+		if (req.isPublished()) {
+			list = quizDao.getAllPublished(quizName, startDate, endDate);
+		} else {
+			list = quizDao.getAll(quizName, startDate, endDate);
+		}
 		return new SearchRes(ResCodeMessage.SUCCESS.getCode(), //
 				ResCodeMessage.SUCCESS.getMessage(), list);
+	}
+
+	@Transactional(rollbackFor = Exception.class)
+	@Override
+	public BasicRes delete(int quizId) throws Exception {
+		if (quizId <= 0) {
+			return new SearchRes(ResCodeMessage.QUIZ_ID_ERROR.getCode(), //
+					ResCodeMessage.QUIZ_ID_ERROR.getMessage());
+		}
+		try {
+			quizDao.deleteById(quizId);
+			questionDao.deleteByQuizId(quizId);
+		} catch (Exception e) {
+			// 不能 retrun BasicRes 而是要將發生的異常拋出去，這樣 @Transaction 才會生效
+			throw e;
+		}
+		return null;
 	}
 }

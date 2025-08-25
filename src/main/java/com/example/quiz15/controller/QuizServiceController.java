@@ -51,4 +51,9 @@ public class QuizServiceController {
 	public SearchRes search(@RequestBody SearchReq req) {
 		return quizService.search(req);
 	}
+	
+	@PostMapping(value = "quiz/delete")
+	public BasicRes delete(@RequestParam("quizId") int quizId) throws Exception {
+		return quizService.delete(quizId);
+	}
 }
