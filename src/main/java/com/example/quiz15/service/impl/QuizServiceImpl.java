@@ -20,6 +20,7 @@ import com.example.quiz15.vo.QuestionRes;
 import com.example.quiz15.vo.QuestionVo;
 import com.example.quiz15.vo.QuizCreateReq;
 import com.example.quiz15.vo.QuizUpdateReq;
+import com.example.quiz15.vo.SearchReq;
 import com.example.quiz15.vo.SearchRes;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -225,5 +226,33 @@ public class QuizServiceImpl implements QuizService {
 		}
 		return new QuestionRes(ResCodeMessage.SUCCESS.getCode(), //
 				ResCodeMessage.SUCCESS.getMessage(), questionVoList);
+	}
+
+	@Override
+	public SearchRes search(SearchReq req) {
+		// 轉換 req 的值
+		// 若 quizName 是 null，轉成空字串
+		String quizName = req.getQuizName();
+		if (quizName == null) {
+			quizName = "";
+		} else { // 多餘的，不需要寫，但為了理解下面的3元運算子而寫
+			quizName = quizName;
+		}
+		// 3元運算子
+		// 格式: 變數名稱 = 條件判斷式 ? 判斷式結果為 true 時要賦予的值 : 判斷式結果為 false 時要賦予的值
+		quizName = quizName == null ? "" : quizName;
+		// 上面的程式碼可以只用下一行來取得值
+		String quizName1 = req.getQuizName() == null ? "" : req.getQuizName();
+		// ========================================
+		// 轉換 開始日期 --> 若沒有給開始日期 --> 給定一個很早的時間
+		LocalDate startDate = req.getStartDate() == null ? LocalDate.of(1970, 1, 1) //
+				: req.getStartDate();
+
+		LocalDate endDate = req.getEndDate() == null ? LocalDate.of(2999, 12, 31) //
+				: req.getEndDate();
+
+		List<Quiz> list = quizDao.getAll(quizName, startDate, endDate);
+		return new SearchRes(ResCodeMessage.SUCCESS.getCode(), //
+				ResCodeMessage.SUCCESS.getMessage(), list);
 	}
 }
