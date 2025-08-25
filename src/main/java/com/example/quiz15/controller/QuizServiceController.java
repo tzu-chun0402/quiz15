@@ -52,6 +52,8 @@ public class QuizServiceController {
 		return quizService.search(req);
 	}
 	
+	// API 的路徑: http://localhost:8080/quiz/get_questions?quizId=1
+	// ?後面的 quizId 必須要和 @RequestParam 括號中的字串一樣
 	@PostMapping(value = "quiz/delete")
 	public BasicRes delete(@RequestParam("quizId") int quizId) throws Exception {
 		return quizService.delete(quizId);
