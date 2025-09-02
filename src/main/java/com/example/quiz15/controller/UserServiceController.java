@@ -14,6 +14,11 @@ import com.example.quiz15.vo.LoginRes;
 
 import jakarta.validation.Valid;
 
+/**
+ * @CrossOrigin</br>
+ * 可提供跨域資源共享的請求，雖然前後端系統都在自己的同一台電腦，但前端呼叫後端提供的 API 會被
+ * 認為是跨域請求
+ */
 @CrossOrigin 
 @RestController
 public class UserServiceController {

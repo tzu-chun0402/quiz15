@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +44,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Service
 public class QuizServiceImpl implements QuizService {
 
-	// ���� ���O(�� Json �榡)�P���󤧶����ഫ
+	// slf4j
+	private Logger logger = LoggerFactory.getLogger(getClass());
+
+	// 提供 類別(或Json 格式)與物件之間的轉換
 	private ObjectMapper mapper = new ObjectMapper();
 
 	@Autowired
@@ -56,83 +61,81 @@ public class QuizServiceImpl implements QuizService {
 
 	/**
 	 * @throws Exception
-	 * @Transactional: �ư�</br>
-	 *                 1. ��@�Ӥ�k������h�� Dao
-	 *                 ��(���άO�P�@�i��g�h�����)�A�o�ǩҦ���������ӳ��n��P�@�����欰�A
-	 *                 �ҥH�o�Ǹ�ƭn�������g�J���\�A���M�N�����g�J����</br>
-	 *                 2. @Transactional ���Ħ^�Ҫ����`�w�]�O
-	 *                 RunTimeException�A�Y�o�ͪ����`���O RunTimeException
-	 *                 �Ψ�l���O�����`�����A��ƬҤ��|�^�ҡA�]���Q�n���u�n�o�ͥ���@�ز��`�ɸ�Ƴ��n�i�H�^�ҡA�i�H
-	 *                 �N @Transactional �����Ľd��q RunTimeException ������
-	 *                 Exception
+	 * @Transactional: 事務</br>
+	 *                 1. 當一個方法中執行多個 Dao 時(跨表或是同一張表寫多筆資料)，這些所有的資料應該都要算同一次的行為，
+	 *                 所以這些資料要嘛全部成功寫入，不然就全部寫入失敗</br>
+	 *                 2. @Transactional 有效回朔的異常預設是 RunTimeException，若發生的異常不是
+	 *                 RunTimeException
+	 *                 或其子類別的異常類型，資料皆不會回朔，因此想要讓只要發生任何一種異常時資料都要可以回朔，可以
+	 *                 將 @Transactional 的有效範圍從 RunTimeException 提高至 Exception
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	@Override
 	public BasicRes create(QuizCreateReq req) throws Exception {
-		// �Ѽ��ˬd�w�z�L @Valid ���ҤF
+		// 參數檢查已透過 @Valid 驗證了
 		try {
-			// �ˬd���: �ϥαư��k
+			// 檢查日期: 使用排除法
 			BasicRes checkRes = checkDate(req.getStartDate(), req.getEndDate());
-			if (checkRes.getCode() != 200) { // ������ 200 ����ˬd�X�����~
+			if (checkRes.getCode() != 200) { // 不等於 200 表示檢查出有錯誤
 				return checkRes;
 			}
-			// �s�W�ݨ�
+			// 新增問卷
 			quizDao.insert(req.getName(), req.getDescription(), req.getStartDate(), //
 					req.getEndDate(), req.isPublished());
-			// �s�W���ݨ���A���o�ݨ��y����
-			// ���M�]�� @Transactional �|���N��ƴ���(commit)�i��Ʈw�A����ڤWSQL�y�k�w�g���槹���A
-			// �̵M�i�H���o��������
+			// 新增完問卷後，取得問卷流水號
+			// 雖然因為 @Transactional 尚未將資料提交(commit)進資料庫，但實際上SQL語法已經執行完畢，
+			// 依然可以取得對應的值
 			int quizId = quizDao.getMaxQuizId();
-			// �s�W���D
-			// ���X�ݨ������Ҧ����D
+			// 新增問題
+			// 取出問卷中的所有問題
 			List<QuestionVo> questionVoList = req.getQuestionList();
-			// �B�z�C�@�D���D
+			// 處理每一題問題
 			for (QuestionVo vo : questionVoList) {
-				// �ˬd�D�������P�ﶵ
+				// 檢查題目類型與選項
 				checkRes = checkQuestionType(vo);
-				// �I�s��k checkQuestionType �o�쪺 res �Y�O null�A����ˬd���S���D�A
-				// �]����k���ˬd��᳣̫�S���D�ɬO�^�� ���\
+				// 呼叫方法 checkQuestionType 得到的 res 若是 成功，表示檢查都沒問題，
+				// 因為方法中檢查到最後都沒問題時是回傳 成功
 				if (checkRes.getCode() != 200) {
 //					return checkRes;
-					// �]���e���w�g����F quizDao.insert �F�A�ҥH�o��n�ߥX Exception
-					// �~�|�� @Transactional �ͮ�
+					// 因為前面已經執行了 quizDao.insert 了，所以這邊要拋出 Exception
+					// 才會讓 @Transactional 生效
 					throw new Exception(checkRes.getMessage());
 				}
-				// �]�� MySQL �S�� List ����Ʈ榡�A�ҥH�n�� options ��Ʈ榡 �q List<String> �ন String
+				// 因為 MySQL 沒有 List 的資料格式，所以要把 options 資料格式 從 List<String> 轉成 String
 				List<String> optionsList = vo.getOptions();
 				String str = mapper.writeValueAsString(optionsList);
-				// �n�O�o�]�w quizId
+				// 要記得設定 quizId
 				questionDao.insert(quizId, vo.getQuestionId(), vo.getQuestion(), //
 						vo.getType(), vo.isRequired(), str);
 			}
 			return new BasicRes(ResCodeMessage.SUCCESS.getCode(), //
 					ResCodeMessage.SUCCESS.getMessage());
 		} catch (Exception e) {
-			// ���� return BasicRes �ӬO�n�N�o�ͪ����`�ߥX�h�A�o�� @Transaction �~�|�ͮ�
+			// 不能 return BasicRes 而是要將發生的異常拋出去，這樣 @Transaction 才會生效
 			throw e;
 		}
 	}
 
 	private BasicRes checkQuestionType(QuestionVo vo) {
-		// 1. �ˬd type �O�_�O�W�w������
+		// 1. 檢查 type 是否是規定的類型
 		String type = vo.getType();
-		// ���] �q vo ���X�� type ���ŦX�w�q��3���������䤤�@�ءA�N��^���~�T��
+		// 假設 從 vo 取出的 type 不符合定義的3種類型的其中一種，就返回錯誤訊息
 		if (!(type.equalsIgnoreCase(QuestionType.SINGLE.getType())//
 				|| type.equalsIgnoreCase(QuestionType.MULTI.getType())//
 				|| type.equalsIgnoreCase(QuestionType.TEXT.getType()))) {
 			return new BasicRes(ResCodeMessage.QUESTION_TYPE_ERROR.getCode(), //
 					ResCodeMessage.QUESTION_TYPE_ERROR.getMessage());
 		}
-		// 2. type �O���Φh�諸�ɭԡA�ﶵ(options)�ܤ֭n��2��
-		// ���] type ������ TEXT --> �N��� type �O���Φh��
+		// 2. type 是單選或多選的時候，選項(options)至少要有2個
+		// 假設 type 不等於 TEXT --> 就表示 type 是單選或是多選
 		if (!type.equalsIgnoreCase(QuestionType.TEXT.getType())) {
-			// ���Φh��ɡA�ﶵ�ܤ֭n��2��
+			// 單選或多選時，選項至少要有2個
 			if (vo.getOptions().size() < 2) {
 				return new BasicRes(ResCodeMessage.OPTIONS_INSUFFICIENT.getCode(), //
 						ResCodeMessage.OPTIONS_INSUFFICIENT.getMessage());
 			}
-		} else { // else --> type �O text --> �ﶵ���ӬO null �άO size = 0
-			// ���] �ﶵ���O null �� �ﶵ�� List ������
+		} else { // else --> type 是 text --> 選項應該是 null 或是 size = 0
+			// 假設 選項不是 null 或 選項的 List 有值
 			if (vo.getOptions() != null && vo.getOptions().size() > 0) {
 				return new BasicRes(ResCodeMessage.TEXT_HAS_OPTIONS_ERROR.getCode(), //
 						ResCodeMessage.TEXT_HAS_OPTIONS_ERROR.getMessage());
@@ -143,9 +146,9 @@ public class QuizServiceImpl implements QuizService {
 	}
 
 	private BasicRes checkDate(LocalDate startDate, LocalDate endDate) {
-		// 1. �}�l�������񵲧������ 2. �}�l���������e�Ыت������
-		// �P�_��: ���] �}�l����񵲧������ �� �}�l������e����� --> �^���~�T��
-		// LocalDate.now() --> ���o��e�����
+		// 1. 開始日期不能比結束日期晚 2. 開始日期不能比當前創建日期早
+		// 判斷式: 假設 開始日期比結束日期晚 或 開始日期比當前日期早 --> 回錯誤訊息
+		// LocalDate.now() --> 取得當前的日期
 		if (startDate.isAfter(endDate) //
 				|| startDate.isBefore(LocalDate.now())) {
 			return new BasicRes(ResCodeMessage.DATE_FORMAT_ERROR.getCode(), //
@@ -156,14 +159,14 @@ public class QuizServiceImpl implements QuizService {
 	}
 
 	private BasicRes checkStatus(LocalDate startDate, boolean isPublished) {
-		// ���\�ݨ��ק諸���A����: 1. �|���o�G 2.�w�o�G+�|���}�l
-		// �̷ӤW������A�{�����g�k�p�U
+		// 允許問卷修改的狀態條件: 1. 尚未發佈 2.已發佈+尚未開始
+		// 依照上面條件，程式的寫法如下
 		// if(!isPublished || (isPublished && startDate.isAfter(LocalDate.now())))
-		// ���O�]��2�ӱ��󦡬O�� OR (||) �걵�A��ܥu�n�@�ӱ��󦨥ߴN�|��^���\
-		// �]���u�n������� || �᭱�����󦡡A���t�� isPublished = true�A
-		// �W���� if ���󦡥i�ק令�p�U
+		// 但是因為2個條件式是用 OR (||) 串接，表示只要一個條件成立就會返回成功
+		// 因此只要有比較到 || 後面的條件式，隱含著 isPublished = true，
+		// 上面的 if 條件式可修改成如下
 		if (!isPublished || startDate.isAfter(LocalDate.now())) {
-			// ��^���\��ܰݨ����\�Q�ק�
+			// 返回成功表示問卷允許被修改
 			return new BasicRes(ResCodeMessage.SUCCESS.getCode(), //
 					ResCodeMessage.SUCCESS.getMessage());
 		}
@@ -174,58 +177,59 @@ public class QuizServiceImpl implements QuizService {
 	@Transactional(rollbackFor = Exception.class)
 	@Override
 	public BasicRes update(QuizUpdateReq req) throws Exception {
-		// �Ѽ��ˬd�w�z�L @Valid ���ҤF
+		// 參數檢查已透過 @Valid 驗證了
 
-		// ��s�O��w�s�b�ݨ��i��ק�
+		// 更新是對已存在問卷進行修改
 		try {
-			// 1. �ˬd quizId �O�_�s�b
+			// 1. 檢查 quizId 是否存在
 			int quizId = req.getQuizId();
 			// int count = quizDao.getCountByQuizId(quizId);
-			// ���ϥ� count �ƦӬO���X�㵧��ƥD�n�O�]�������ٷ|�ϥΨ��Ʈw�������
+			// 不使用 count 數而是取出整筆資料主要是因為後續還會使用到資料庫中的資料
 			Quiz quiz = quizDao.getById(quizId);
 			if (quiz == null) {
 				return new BasicRes(ResCodeMessage.NOT_FOUND.getCode(), //
 						ResCodeMessage.NOT_FOUND.getMessage());
 			}
-			// 2. �ˬd���
+			// 2. 檢查日期
 			BasicRes checkRes = checkDate(req.getStartDate(), req.getEndDate());
-			if (checkRes.getCode() != 200) { // ������ 200 ����ˬd�X�����~
+			if (checkRes.getCode() != 200) { // 不等於 200 表示檢查出有錯誤
 				return checkRes;
 			}
-			// 3. �ˬd�쥻���ݨ����A(������쪺�ȬO�s�b��DB��)�O�_�i�Q��s
+			// 3. 檢查原本的問卷狀態(相關欄位的值是存在於DB中)是否可被更新
 			checkRes = checkStatus(quiz.getStartDate(), quiz.isPublished());
-			if (checkRes.getCode() != 200) { // ������ 200 ��ܰݨ������\�Q��s
+			if (checkRes.getCode() != 200) { // 不等於 200 表示問卷不允許被更新
 				return checkRes;
 			}
-			// 4. ��s�ݨ�
+			// 4. 更新問卷
 			int updateRes = quizDao.update(quizId, req.getName(), req.getDescription(), //
 					req.getStartDate(), req.getEndDate(), req.isPublished());
-			if (updateRes != 1) { // ��ܸ�ƨS��s���\
+			if (updateRes != 1) { // 表是資料沒更新成功
 				return new BasicRes(ResCodeMessage.QUIZ_UPDATE_FAILED.getCode(), //
 						ResCodeMessage.QUIZ_UPDATE_FAILED.getMessage());
 			}
-			// 5. �R���P�@�i�ݨ����Ҧ����D
+			// 5. 刪除同一張問卷的所有問題
 			questionDao.deleteByQuizId(quizId);
-			// 6. �ˬd���D
+			// 6. 檢查問題
 			List<QuestionVo> questionVoList = req.getQuestionList();
 			for (QuestionVo vo : questionVoList) {
-				// �ˬd�D�������P�ﶵ
+				// 檢查題目類型與選項
 				checkRes = checkQuestionType(vo);
-				// ��k���ˬd��᳣̫�S���D�ɬO�^�� ���\
+				// 方法中檢查到最後都沒問題時是回傳 成功
 				if (checkRes.getCode() != 200) {
-					// �]���e���w�g����F quizDao.insert �F�A�ҥH�o��n�ߥX Exception
-					// �~�|�� @Transactional �ͮ�
+					// 因為前面已經執行了 quizDao.insert 了，所以這邊要拋出 Exception
+					// 才會讓 @Transactional 生效
 					throw new Exception(checkRes.getMessage());
 				}
-				// �]�� MySQL �S�� List ����Ʈ榡�A�ҥH�n�� options ��Ʈ榡 �q List<String> �ন String
+				// 因為 MySQL 沒有 List 的資料格式，所以要把 options 資料格式 從 List<String> 轉成 String
 				List<String> optionsList = vo.getOptions();
 				String str = mapper.writeValueAsString(optionsList);
-				// �n�O�o�]�w quizId
+				// 要記得設定 quizId
 				questionDao.insert(quizId, vo.getQuestionId(), vo.getQuestion(), //
 						vo.getType(), vo.isRequired(), str);
 			}
 		} catch (Exception e) {
-			// ���� return BasicRes �ӬO�n�N�o�ͪ����`�ߥX�h�A�o�� @Transaction �~�|�ͮ�
+			logger.error(e.getMessage());
+			// 不能 return BasicRes 而是要將發生的異常拋出去，這樣 @Transaction 才會生效
 			throw e;
 		}
 		return new BasicRes(ResCodeMessage.SUCCESS.getCode(), //
@@ -247,21 +251,20 @@ public class QuizServiceImpl implements QuizService {
 		}
 		List<QuestionVo> questionVoList = new ArrayList<>();
 		List<Question> list = questionDao.getQuestionsByQuizId(quizId);
-		// ��C�D�ﶵ����ƫ��A�q String �ഫ�� List<String>
+		// 把每題選項的資型態從 String 轉換成 List<String>
 		for (Question item : list) {
 			String str = item.getOptions();
 			try {
 				List<String> optionList = mapper.readValue(str, new TypeReference<>() {
 				});
-				// �N�qDB���o���C�@�����(Question item) ���C�����ȩ�� QuestionVo
-				// ���A�H�K��^���ϥΪ�
-				// Question �M QuestionVo ���t�O�b�� �ﶵ ����ƫ��A
+				// 將從DB取得的每一筆資料(Question item) 的每個欄位值放在 QuestionVo中，以便返回給使用者
+				// Question 和 QuestionVo 的差別在於 選項 的資料型態
 				QuestionVo vo = new QuestionVo(item.getQuizId(), item.getQuestionId(), //
 						item.getQuestion(), item.getType(), item.isRequired(), optionList);
-				// ��C�� vo ��� questionVoList ��
+				// 把每個 vo 放到 questionVoList 中
 				questionVoList.add(vo);
 			} catch (Exception e) {
-				// �o�䤣�g throw e �O�]������k���S���ϥ� @Transactional�A���v�T��^���G
+				// 這邊不寫 throw e 是因為這次方法中沒有使用 @Transactional，不影響返回結果
 				return new QuestionRes(ResCodeMessage.OPTIONS_TRANSFER_ERROR.getCode(), //
 						ResCodeMessage.OPTIONS_TRANSFER_ERROR.getMessage());
 			}
@@ -272,22 +275,21 @@ public class QuizServiceImpl implements QuizService {
 
 	@Override
 	public SearchRes search(SearchReq req) {
-		// �ഫ req ����
-		// �Y quizName �O null�A�ন�Ŧr��
+		// 轉換 req 的值
+		// 若 quizName 是 null，轉成空字串
 		String quizName = req.getQuizName();
 		if (quizName == null) {
 			quizName = "";
-		} else { // �h�l���A���ݭn�g�A�����F�z�ѤU����3���B��l�Ӽg
+		} else { // 多餘的，不需要寫，但為了理解下面的3元運算子而寫
 			quizName = quizName;
 		}
-		// 3���B��l
-		// �榡: �ܼƦW�� = ����P�_�� ? �P�_�����G�� true �ɭn�ᤩ���� : �P�_�����G�� false
-		// �ɭn�ᤩ����;
+		// 3元運算子
+		// 格式: 變數名稱 = 條件判斷式 ? 判斷式結果為 true 時要賦予的值 : 判斷式結果為 false 時要賦予的值;
 		quizName = quizName == null ? "" : quizName;
-		// �W�����{���X�i�H�u�ΤU���@��Ө��o��
+		// 上面的程式碼可以只用下面一行來取得值
 		String quizName1 = req.getQuizName() == null ? "" : req.getQuizName();
 		// =========================================
-		// �ഫ �}�l��� --> �Y�S�����}�l��� --> ���w�@�ӫܦ����ɶ�
+		// 轉換 開始時間 --> 若沒有給開始日期 --> 給定一個很早的時間
 		LocalDate startDate = req.getStartDate() == null ? LocalDate.of(1970, 1, 1) //
 				: req.getStartDate();
 
@@ -311,21 +313,21 @@ public class QuizServiceImpl implements QuizService {
 					ResCodeMessage.QUIZ_ID_ERROR.getMessage());
 		}
 		Quiz quiz = quizDao.getById(quizId);
-		// �n�P�_�O�_�� null�A�Y���P�_�B���o���ȬO null �ɡA����ϥΤ�k�|����
+		// 要判斷是否為 null，若不判斷且取得的值是 null 時，後續使用方法會報錯
 		if (quiz == null) {
 			return new BasicRes(ResCodeMessage.NOT_FOUND.getCode(), //
 					ResCodeMessage.NOT_FOUND.getMessage());
 		}
-		// �ˬd�ݨ����A�O�_�i�Q��s
+		// 檢查問卷狀態是否可被更新
 		BasicRes checkRes = checkStatus(quiz.getStartDate(), quiz.isPublished());
-		if (checkRes.getCode() != 200) { // ������ 200 ��ܰݨ������\�Q��s
+		if (checkRes.getCode() != 200) { // 不等於 200 表示問卷不允許被更新
 			return checkRes;
 		}
 		try {
 			quizDao.deleteById(quizId);
 			questionDao.deleteByQuizId(quizId);
 		} catch (Exception e) {
-			// ���� return BasicRes �ӬO�n�N�o�ͪ����`�ߥX�h�A�o�� @Transaction �~�|�ͮ�
+			// 不能 return BasicRes 而是要將發生的異常拋出去，這樣 @Transaction 才會生效
 			throw e;
 		}
 		return null;
@@ -334,40 +336,40 @@ public class QuizServiceImpl implements QuizService {
 	@Transactional(rollbackFor = Exception.class)
 	@Override
 	public BasicRes fillin(FillinReq req) throws Exception {
-		// �ˬd��g���ݨ�(quiz)
-		// �ˬd 1. �O�_�w�o�� 2. ��U������O�_�i�H��g(��ѬO�_���� �}�l����M������� ����)
+		// 檢查填寫的問卷(quiz)
+		// 檢查 1. 是否以發佈 2. 當下的日期是否可以填寫(當天是否介於 開始日期和結束日期 之間)
 		int count = quizDao.selectCountById(req.getQuizId(), LocalDate.now());
 		if (count != 1) {
 			return new BasicRes(ResCodeMessage.QUIZ_ID_ERROR.getCode(), //
 					ResCodeMessage.QUIZ_ID_ERROR.getMessage());
 		}
-		// �ˬd�@�� email ����A�g�P�@���ݨ�
+		// 檢查同一個 email 只能寫同一份問卷
 		count = fillinDao.selectCountByQuizIdAndEmail(req.getQuizId(), req.getEmail());
 		if (count != 0) {
 			return new BasicRes(ResCodeMessage.EMAIL_DUPLICATED.getCode(), //
 					ResCodeMessage.EMAIL_DUPLICATED.getMessage());
 		}
-		// �ˬd�D��
-		// �ˬd 1. ������S������ 2. �������h�ӵ��� 3. ���׸�ﶵ�O�@��(���ץ����O�ﶵ���@)
-		// ���o�@�i�ݨ����Ҧ��D��
+		// 檢查題目
+		// 檢查 1. 必填但沒有答案 2. 單選但有多個答案 3. 答案和選項是一樣(答案必須是選項之一)
+		// 取得一張問卷所有題目
 		List<Question> questionList = questionDao.getQuestionsByQuizId(req.getQuizId());
 		List<QuestionIdAnswerVo> questionAnswerVoList = req.getQuestionAnswerVoList();
-		// �N���D�s���M�^���ഫ�� Map�A�N�O�N QuestionAnswerVo �̭���2���ݩ��ন Map
+		// 將問題編號和回答轉換成 Map，就是將 QuestionAnswerVo 裡面的2個屬性轉成 Map
 		Map<Integer, List<String>> answerMap = new HashMap<>();
 		for (QuestionIdAnswerVo vo : questionAnswerVoList) {
 			answerMap.put(vo.getQuestionId(), vo.getAnswerList());
 		}
-		// �ˬd�C�@�D
+		// 檢查每一題
 		for (Question question : questionList) {
 			int questionId = question.getQuestionId();
 			String type = question.getType();
 			boolean required = question.isRequired();
-			// 1. �ˬd������S������ --> ����� questionId �S���b answerMap �� key �̭�
+			// 1.檢查必填但沒有答案 --> 必填但 questionId 沒有在 answerMap 的 key 裡面
 			if (required && !answerMap.containsKey(questionId)) {
 				return new BasicRes(ResCodeMessage.ANSWER_REQUIRED.getCode(), //
 						ResCodeMessage.ANSWER_REQUIRED.getMessage());
 			}
-			// 2. �ˬd�������h�ӵ���
+			// 2. 檢查單選但有多個答案
 			if (type.equalsIgnoreCase(QuestionType.SINGLE.getType())) {
 				List<String> answerList = answerMap.get(questionId);
 				if (answerList.size() > 1) {
@@ -375,24 +377,24 @@ public class QuizServiceImpl implements QuizService {
 							ResCodeMessage.QUESTION_TYPE_IS_SINGLE.getMessage());
 				}
 			}
-			// ²���D�S���ﶵ�A���L���D
+			// 簡答題沒有選項，跳過
 			if (type.equalsIgnoreCase(QuestionType.TEXT.getType())) {
 				continue;
 			}
-			// 3. �����D�����׸�ﶵ�O�_�@��(���ץ����O�ﶵ���@)
+			// 3. 比對該題的答案和選項是一樣(答案必須是選項之一)
 			String optionsStr = question.getOptions();
 			List<String> answerList = answerMap.get(questionId);
 			for (String answer : answerList) {
-				// �N�C�ӵ��פ��O�_�Q�]�t�b�ﶵ�r�ꤤ
+				// 將每個答案比對是否被包含在選項字串中
 				if (!optionsStr.contains(answer)) {
 					return new BasicRes(ResCodeMessage.OPTION_ANSWER_MISMATCH.getCode(), //
 							ResCodeMessage.OPTION_ANSWER_MISMATCH.getMessage());
 				}
 			}
 		}
-		// �s���: �@�D�s���@�����
+		// 存資料: 一提存成一筆資料
 		for (QuestionIdAnswerVo vo : questionAnswerVoList) {
-			// �� answerList �ন�r�ꫬ�A
+			// 把 answerList 轉成字串型態
 			try {
 				String str = mapper.writeValueAsString(vo.getAnswerList());
 				fillinDao.insert(req.getQuizId(), vo.getQuestionId(), req.getEmail(), //
@@ -406,24 +408,24 @@ public class QuizServiceImpl implements QuizService {
 	}
 
 	public BasicRes fillin_test(FillinReq req) {
-		// �ˬd��g���ݨ�(quiz)
-		// �ˬd 1. �O�_�w�o�� 2. ��U������O�_�i�H��g(��ѬO�_���� �}�l����M������� ����)
+		// 檢查填寫的問卷(quiz)
+		// 檢查 1. 是否以發佈 2. 當下的日期是否可以填寫(當天是否介於 開始日期和結束日期 之間)
 		int count = quizDao.selectCountById(req.getQuizId(), LocalDate.now());
 		if (count != 1) {
 			return new BasicRes(ResCodeMessage.QUIZ_ID_ERROR.getCode(), //
 					ResCodeMessage.QUIZ_ID_ERROR.getMessage());
 		}
-		// �ˬd�D��
-		// �ˬd 1. ������S������ 2. �������h�ӵ��� 3. ���׸�ﶵ�O�@��(���ץ����O�ﶵ���@)
-		// ���o�@�i�ݨ����Ҧ��D��
+
+		// 檢查題目
+		// 檢查 1. 必填但沒有答案 2. 單選但有多個答案 3. 答案和選項是一樣(答案必須是選項之一)
+		// 取得一張問卷所有題目
 		List<Question> questionList = questionDao.getQuestionsByQuizId(req.getQuizId());
 		List<QuestionIdAnswerVo> questionAnswerVoList = req.getQuestionAnswerVoList();
-		// questionAnswerVoList �� size �i��|�� questionList �� size
-		// �֡A�]�����i��O�D����ӨS����
-		// �]���n���D�C�@�D�O�_����B��h��A�o�ˤ~�ள��g�����רӤ��
-		// --> �ҥH questionList �n���~�h�j��
-
-		// ���⥲���D�� questionId ���@�� List ��
+		// questionAnswerVoList 的 size 可能會比 questionList 的 size 少，因為有可能是非必填而沒做答
+		// 因為要知道每一題是否必填、單多選，這樣才能拿填寫的答案來比對
+		// --> 所以 questionList 要當成外層迴圈
+		
+		// 先把必填題的 questionId 放到一個 List 中
 		List<Integer> questionIdList = new ArrayList<>();
 		for (Question question : questionList) {
 			if (question.isRequired()) {
@@ -435,26 +437,24 @@ public class QuizServiceImpl implements QuizService {
 			int questionId = question.getQuestionId();
 			String type = question.getType();
 			boolean required = question.isRequired();
-			// ���D�O���� --> �ˬd VoList ���O�_�����D���s���s�b
+			// 該題是必填 --> 檢查 VoList 中是否有該題的編號存在
 			for (QuestionIdAnswerVo vo : questionAnswerVoList) {
 				int voQuestionId = vo.getQuestionId();
-				// ���D������D�ؽs�����]�t�b questionIdList�A�^�ǿ��~
+				// 該題必填但題目編號不包含在 questionIdList，回傳錯誤
 				if (required && !questionIdList.contains(voQuestionId)) {
 					return new BasicRes(ResCodeMessage.ANSWER_REQUIRED.getCode(), //
 							ResCodeMessage.ANSWER_REQUIRED.getMessage());
 				}
-
 				List<String> answerList = vo.getAnswerList();
-				// �ˬd�ۦP�� questionId�A���D�O������S������ --> �^�ǿ��~
+				// 檢查相同的 questionId，該題是必填但沒有答案 --> 回傳錯誤
 				if (questionId == voQuestionId && required //
-				// CollectionUtils.isEmpty ���P�_�� null
-				// QuestionAnswerVo ���� answerList �����w�s���w�]�ȡA�S�� mapping ��ɷ|�O�@�ӪŪ�
-				// List
+						// CollectionUtils.isEmpty 有判斷到 null
+						// QuestionAnswerVO 中的 answerList 有給定新的預設值，沒有 mapping 到時會是一個空的 List
 						&& answerList.isEmpty()) {
 					return new BasicRes(ResCodeMessage.ANSWER_REQUIRED.getCode(), //
 							ResCodeMessage.ANSWER_REQUIRED.getMessage());
 				}
-				// �ˬd�ۦP�� questionId�A�������h�ӵ��� --> �^�ǿ��~
+				// 檢查相同的 questionId，單選但有多個答案 --> 回傳錯誤
 				if (questionId == voQuestionId && type == QuestionType.SINGLE.getType() //
 						&& answerList.size() > 1) {
 					return new BasicRes(ResCodeMessage.QUESTION_TYPE_IS_SINGLE.getCode(), //
@@ -486,21 +486,40 @@ public class QuizServiceImpl implements QuizService {
 		List<QuestionAnswerVo> voList = new ArrayList<>();
 		// 將QuestionAnswerDto 轉成 QuestionAnswerVo
 		for (QuestionAnswerDto dto : dtoList) {
-			// 將 dto 中的 answerStr 轉換成List<String>
+			List<String> answerList;
 			try {
-				List<String> answerList = mapper.readValue(dto.getAnswerStr(), new TypeReference<>() {
-				});
-				// 一對一將 dto 的資料設定到 vo 中
-				QuestionAnswerVo vo = new QuestionAnswerVo(dto.getQuestionId(), //
-						dto.getQuestion(), dto.getType(), dto.isRequired(), answerList);
-				voList.add(vo);
+				if (dto.getAnswerStr() == null || dto.getAnswerStr().isBlank()) {
+					// 非必填題沒有填，給空陣列
+					answerList = new ArrayList<>();
+				} else {
+					answerList = mapper.readValue(dto.getAnswerStr(), new TypeReference<List<String>>() {
+					});
+				}
 			} catch (Exception e) {
-				// 不需要 throw 因為沒有使用 @Transactional，就只有取資料而已，所以可以 return 自定義
-				// �۩w�q�����~��T
-				return new FeedbackRes(ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getCode(), //
-						ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getMessage());
+				// parse 失敗也給空陣列，而不是直接回錯
+				answerList = new ArrayList<>();
 			}
+
+			QuestionAnswerVo vo = new QuestionAnswerVo(dto.getQuestionId(), dto.getQuestion(), dto.getType(),
+					dto.isRequired(), answerList);
+			voList.add(vo);
 		}
+		// 原寫法
+//		// 將QuestionAnswerDto 轉成 QuestionAnswerVo
+//		for (QuestionAnswerDto dto : dtoList) {
+//			// 將 dto 中的 answerStr 轉換成List<String>
+//			try {
+//				List<String> answerList = mapper.readValue(dto.getAnswerStr(), new TypeReference<>() {});
+//				// 一對一將 dto 的資料設定到 vo 中
+//				QuestionAnswerVo vo = new QuestionAnswerVo(dto.getQuestionId(), //
+//						dto.getQuestion(), dto.getType(), dto.isRequired(), answerList);
+//				voList.add(vo);
+//			} catch (Exception e) {
+//				// 不需要 throw 因為沒有使用 @Transactional，就只有取資料而已，所以可以 return 自定義
+//				return new FeedbackRes(ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getCode(), //
+//						ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getMessage());
+//			}
+//		}
 		return new FeedbackRes(ResCodeMessage.SUCCESS.getCode(), //
 				ResCodeMessage.SUCCESS.getMessage(), voList);
 	}
@@ -513,20 +532,18 @@ public class QuizServiceImpl implements QuizService {
 		}
 		// 1. 取得問題和作答的資料
 		List<QuestionAnswerDto> dtoList = fillinDao.selectQuestionAnswerList(quizId);
-		// 2. 建立 Map 蒐集 ""選擇題"" 相同題號的所有作答: 作答也是選項，只是 List 中的字串會重複
+		// 2. 建立 Map 蒐集 ""所有題目"" 相同題號的所有作答: 作答也是選項，只是 List 中的字串會重複
 		// Map<問題編號, 所有作答>
 		Map<Integer, List<String>> quIdAnswerMap = new HashMap<>();
 		for (QuestionAnswerDto dto : dtoList) {
-			// 跳過簡答題
-			if (dto.getType().equalsIgnoreCase(QuestionType.TEXT.getType())) {
-				continue;
-			}
 			// 將 dto 中的 answerStr 轉換成 List<String>
 			try {
-				List<String> answerList = mapper.readValue(dto.getAnswerStr(), new TypeReference<>() {
-				});
+				List<String> answerList = new ArrayList<>();
+				if (dto.getAnswerStr() != null && !dto.getAnswerStr().isEmpty()) {
+					answerList = mapper.readValue(dto.getAnswerStr(), new TypeReference<>() {
+					});
+				}
 				if (quIdAnswerMap.containsKey(dto.getQuestionId())) {
-					// Map 的特性是有相同的 key，其對應的 value 會後蓋前: 所以 key 若已存在，不能直接 put 值
 					// 若 quIdAnswerMap 中已存在 key，則把 key 對應的 value 取出後，與新的值相加
 					List<String> oldList = quIdAnswerMap.get(dto.getQuestionId());
 					// 把 answerList 加入到原本的 List 中
@@ -543,30 +560,29 @@ public class QuizServiceImpl implements QuizService {
 						ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getMessage());
 			}
 		}
-		// 3.取得每題問題的選項
+		// 3.取得每題問題
 		List<Question> questionList = questionDao.getQuestionsByQuizId(quizId);
 		// 建立題號和選項次數Vo陣列的 map: Map<題號, 選項次數VoList>
 		Map<Integer, List<OptionCountVo>> quIdOptionVoListMap = new HashMap<>();
 		for (Question question : questionList) {
 			try {
-				// 跳過 簡答題
-				if (question.getType().equalsIgnoreCase(QuestionType.TEXT.getType())) {
-					continue;
+				// 跳過選項題時的處理：簡答題的 options 為空
+				if (!question.getType().equalsIgnoreCase(QuestionType.TEXT.getType())) {
+					// 把選項字串轉換成 List
+					List<String> optionList = mapper.readValue(question.getOptions(), new TypeReference<>() {
+					});
+					List<OptionCountVo> voList = new ArrayList<>();
+					// 把選項 optionList 中的每個選項轉成 OptionCountVo
+					for (String op : optionList) {
+						// 每個 op 就是一個選項
+						OptionCountVo vo = new OptionCountVo(op, 0);
+						voList.add(vo);
+					}
+					quIdOptionVoListMap.put(question.getQuestionId(), voList);
+				} else {
+					// 簡答題的 OptionCountVo 設為空
+					quIdOptionVoListMap.put(question.getQuestionId(), new ArrayList<>());
 				}
-				// 把選項字串轉換成 List
-				List<String> optionList = mapper.readValue(question.getOptions(), new TypeReference<>() {
-				});
-				List<OptionCountVo> voList = new ArrayList<>();
-				// 把選項 optionList 中的每個選項轉成 OptionCountVo
-				for (String op : optionList) {
-					// 每個 op 就是一個選項
-					OptionCountVo vo = new OptionCountVo(op, 0);
-					voList.add(vo);
-				}
-				// 把每題對應的選項 List 放到 map 中
-				// 不需要判斷 quIdOptionListMap 的 key 是否已存在，因為相同問卷，
-				// 其問題編號不會重複，也就是只會有一筆資料而已
-				quIdOptionVoListMap.put(question.getQuestionId(), voList);
 			} catch (Exception e) {
 				return new StatisticsRes(ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getCode(), //
 						ResCodeMessage.OBJECTMAPPER_PROCESSING_ERROR.getMessage());
@@ -578,6 +594,8 @@ public class QuizServiceImpl implements QuizService {
 			List<OptionCountVo> voList = map.getValue();
 			// 1. 從 quIdAnswerMap 中，取得相同 key 對應的 value
 			List<String> answerList = quIdAnswerMap.get(questionId);
+			if (answerList == null)
+				continue; // 若沒有作答，跳過
 			for (OptionCountVo vo : voList) {
 				// 紀錄 answerList 的 size，因為每次迴圈跑完 answerList 應該都會變更
 				int size = answerList.size();
@@ -591,21 +609,17 @@ public class QuizServiceImpl implements QuizService {
 				vo.setCount(count);
 			}
 		}
-		// 5. 設定 res
+		// 5. 設定 res，遍歷所有題目，簡答題 OptionCountVo 為空
 		List<StatisticsVo> statisticsVoList = new ArrayList<>();
-		for (Entry<Integer, List<OptionCountVo>> map : quIdOptionVoListMap.entrySet()) {
-			// 將從 DB 取得的資料 set 到 vo
-			for (QuestionAnswerDto dto : dtoList) {
-				// 設定相同題號的資料
-				if (map.getKey() == dto.getQuestionId()) {
-					StatisticsVo vo = new StatisticsVo(dto.getQuestionId(), dto.getQuestion(), //
-							dto.getType(), dto.isRequired(), map.getValue());
-					statisticsVoList.add(vo);
-				}
-			}
+		for (Question question : questionList) {
+			List<OptionCountVo> voList = quIdOptionVoListMap.getOrDefault(question.getQuestionId(), new ArrayList<>());
+			List<String> answers = quIdAnswerMap.getOrDefault(question.getQuestionId(), new ArrayList<>());
+
+			StatisticsVo vo = new StatisticsVo(question.getQuestionId(), question.getQuestion(), question.getType(), //
+					question.isRequired(), voList, answers);
+			statisticsVoList.add(vo);
 		}
 		return new StatisticsRes(ResCodeMessage.SUCCESS.getCode(), //
 				ResCodeMessage.SUCCESS.getMessage(), statisticsVoList);
 	}
-
 }

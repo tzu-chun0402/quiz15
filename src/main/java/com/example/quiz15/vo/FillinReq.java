@@ -16,7 +16,7 @@ public class FillinReq {
 	@NotBlank(message = ConstantsMessage.EMAIL_ERROR)
 	private String email;
 
-	@Valid // ¦]¬° vo ¸Ì­±ªº questionId ¦³ÅçÃÒ¡A©Ò¥H­n¥[¤W @Valid ¤~·|Åı¸ÓÅçÃÒ¥Í®Ä
+	@Valid // å› ç‚º vo è£¡é¢çš„ questionId æœ‰é©—è­‰ï¼Œæ‰€ä»¥è¦åŠ ä¸Š @Valid æ‰æœƒè®“è©²é©—è­‰ç”Ÿæ•ˆ
 	private List<QuestionIdAnswerVo> questionAnswerVoList;
 
 	public int getQuizId() {

@@ -7,13 +7,13 @@ import com.example.quiz15.constants.ConstantsMessage;
 
 import jakarta.validation.constraints.Min;
 
-// ¦¹ class ±N°İÃD½s¸¹©M§@µª¸j¦b¤@°_
+// æ­¤ class å°‡å•é¡Œç·¨è™Ÿå’Œä½œç­”ç¶åœ¨ä¸€èµ·
 public class QuestionIdAnswerVo {
 
 	@Min(value = 1, message = ConstantsMessage.QUESTION_ID_ERROR)
 	private int questionId;
 
-	// µ¹©w¹w³]­È: answerList ªº¹w³]­È·|±q null ÅÜ¦¨ ªÅªºList
+	// çµ¦å®šé è¨­å€¼: answerList çš„é è¨­å€¼æœƒå¾ null è®Šæˆ ç©ºçš„List
 	private List<String> answerList = new ArrayList<>();
 
 	public int getQuestionId() {

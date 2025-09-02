@@ -13,19 +13,22 @@ public class StatisticsVo {
 	private boolean required;
 
 	private List<OptionCountVo> optionCountVoList;
+	
+	private List<String> answers;
 
 	public StatisticsVo() {
 		super();
 	}
 
 	public StatisticsVo(int questionId, String question, String type, boolean required,
-			List<OptionCountVo> optionCountVoList) {
+			List<OptionCountVo> optionCountVoList, List<String> answers) {
 		super();
 		this.questionId = questionId;
 		this.question = question;
 		this.type = type;
 		this.required = required;
 		this.optionCountVoList = optionCountVoList;
+		this.answers = answers;
 	}
 
 	public int getQuestionId() {
@@ -47,4 +50,9 @@ public class StatisticsVo {
 	public List<OptionCountVo> getOptionCountVoList() {
 		return optionCountVoList;
 	}
+	
+	public List<String> getAnswers() {
+        return answers;
+    }
+
 }

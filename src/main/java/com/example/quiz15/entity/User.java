@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Pattern;
 @Table(name = "user")
 public class User {
 
+	// @NotBlank: 限制字串值不能為 null 或 空字串 或全空白字串
 	@NotBlank(message = ConstantsMessage.NAME_ERROR)
 	@Column(name = "name")
 	private String name;

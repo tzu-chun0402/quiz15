@@ -27,6 +27,10 @@ public interface QuizDao extends JpaRepository<Quiz, Integer> {
 	@Query(value = "select count(id) from quiz where id = ?1", nativeQuery = true)
 	public int getCountByQuizId(int quizId);
 	
+	/**
+	 * 回傳值的資料型態設定成 int 主要是用來判斷資料是否有正確更新成功，
+	 * int = 1 表示有資料被更新 : 0則表示無資料被更新
+	 */
 	@Modifying
 	@Transactional
 	@Query(value = "update quiz set name = ?2, description = ?3, start_date =?4," //
@@ -41,6 +45,7 @@ public interface QuizDao extends JpaRepository<Quiz, Integer> {
 			+ " and end_date <= ?3", nativeQuery = true)
 	public List<Quiz> getAll(String name, LocalDate startDate, LocalDate endDate);
 	
+	// is_published is true: is 只能用在 boolean 值的欄位，is 也可以替換成等於(=)
 	@Query(value = "select * from quiz where name like %?1% and start_date >= ?2" //
 			+ " and end_date <= ?3 and is_published is true", nativeQuery = true)
 	public List<Quiz> getAllPublished(String name, LocalDate startDate, //
@@ -54,6 +59,7 @@ public interface QuizDao extends JpaRepository<Quiz, Integer> {
 	@Query(value = "select * from quiz where id = ?1", nativeQuery = true)
 	public Quiz getById(int id);
 	
+	// 判斷該問卷是否已發佈以及當下的日期是否介於開始日期和結束日期之間
 	@Query(value = "select count(id) from quiz where id = ?1 and ?2 >= start_date " //
 			+ " and ?2 <= end_date and is_published is true", nativeQuery = true)
 	public int selectCountById(int id, LocalDate now);

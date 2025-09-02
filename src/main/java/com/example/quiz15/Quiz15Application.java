@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 
-//¦]¬°¦³¨Ï¥Î spring-boot-starter-security ¦¹¨Ì¿à¡A­n±Æ°£¹w³]ªº°ò¥»¦w¥ş©Ê³]©w(±b±Kµn¤JÅçÃÒ)
-//±Æ°£±b±Kµn¤JÅçÃÒ´N¬O¥[¤W exclude = SecurityAutoConfiguration.class
-//µ¥¸¹«á­±­Y¦³¦h­Ó class ®É¡A´N­n¥Î¤j¬A¸¹¡A¤@­Ó®É¤j¬A¸¹¥i¦³¥iµL
-//¦h­Ó class ¬O¥Î³r¸¹(,)°Ï¹j
+//å› ç‚ºæœ‰ä½¿ç”¨ spring-boot-starter-security æ­¤ä¾è³´ï¼Œè¦æ’é™¤é è¨­çš„åŸºæœ¬å®‰å…¨æ€§è¨­å®š(å¸³å¯†ç™»å…¥é©—è­‰)
+//æ’é™¤å¸³å¯†ç™»å…¥é©—è­‰å°±æ˜¯åŠ ä¸Š exclude = SecurityAutoConfiguration.class
+//ç­‰è™Ÿå¾Œé¢è‹¥æœ‰å¤šå€‹ class æ™‚ï¼Œå°±è¦ç”¨å¤§æ‹¬è™Ÿï¼Œä¸€å€‹æ™‚å¤§æ‹¬è™Ÿå¯æœ‰å¯ç„¡
+//å¤šå€‹ class ç”¨é€—è™Ÿ(,)å€éš”
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
 public class Quiz15Application {
 

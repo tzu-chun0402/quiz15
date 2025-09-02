@@ -23,7 +23,7 @@ dependencies {
 	implementation 'com.mysql:mysql-connector-j'
 	// security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	// validation: �������
+	// validation: 資料驗證
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

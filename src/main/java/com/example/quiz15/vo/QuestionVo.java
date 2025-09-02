@@ -7,13 +7,13 @@ import com.example.quiz15.constants.ConstantsMessage;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
-// ¤@­Ó QuestionVo ¥Nªí¤@ÃD
+// ä¸€å€‹ QuestionVo ä»£è¡¨ä¸€é¡Œ
 public class QuestionVo {
 
-	// ¦¹Äİ©Ê¤£ÀË¬d
-	// QuestionVo ³Q¨Ï¥Î¦b QuizCreateReq ©M QuestionRes 2­ÓÃş§O¤¤¡A
-	// ·í¨Ï¥Î¦b QuizCreateReq ®É¦¹Äİ©ÊµL§@¥Î¡A¦]°İ¨÷½s¸¹¬O¦Û°Ê¥Í¦¨ªº¬y¤ô¸¹¡F
-	// ·í¨Ï¥Î¦b QuestionRes ®É«h¥²¶·­n¦³°İ¨÷½s¸¹ªº­È
+	// æ­¤å±¬æ€§ä¸æª¢æŸ¥
+	// QuestionVo è¢«ä½¿ç”¨åœ¨ QuizCreateReq å’Œ QuestionRes 2å€‹é¡åˆ¥ä¸­
+	// ç•¶ä½¿ç”¨åœ¨ QuizCreateReq æ™‚æ­¤å±¬æ€§ç„¡ä½œç”¨ï¼Œå› å•å·ç·¨è™Ÿæ˜¯è‡ªå‹•ç”¢ç”Ÿçš„æµæ°´è™Ÿ:
+	// ç•¶ä½¿ç”¨åœ¨ QuestionRes æ™‚å‰‡å¿…é ˆè¦æœ‰å•å·ç·¨è™Ÿçš„å€¼
 	private int quizId;
 
 	@Min(value = 1, message = ConstantsMessage.QUESTION_ID_ERROR)
@@ -27,7 +27,7 @@ public class QuestionVo {
 
 	private boolean required;
 
-	// ¤£ÀË¬d¡A¦]¬°Â²µªÃD¤£·|¦³¿ï¶µ
+	// ä¸æª¢æŸ¥ï¼Œå› ç‚ºç°¡ç­”é¡Œä¸æœƒæœ‰é¸é …
 	private List<String> options;
 
 	public QuestionVo() {

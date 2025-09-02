@@ -6,7 +6,7 @@ public class FeedbackUserRes extends BasicRes {
 
 	private int quizId;
 
-	// ¤@±i°İ¨÷¥i¯à·|¦³¦h­Ó¤H¶ñ¼g
+	// ä¸€å¼µå•å·å¯èƒ½æœƒæœ‰å¤šå€‹äººå¡«å¯«
 	private List<UserVo> userVoList;
 
 	public FeedbackUserRes() {

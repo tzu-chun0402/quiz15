@@ -10,10 +10,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-// ¤@­Ó QuizCreateReq ªí¥Ü¤@±i°İ¨÷
+// ä¸€å€‹ QuizCreateReq è¡¨ç¤ºä¸€å¼µå•å·
 public class QuizCreateReq {
 
-	// ¤£±a°İ¨÷ªº½s¸¹¬O¦]¬°°İ¨÷½s¸¹¬O¦Û°Ê¥Í¦¨ªº¬y¤ô¸¹
+	// ä¸å¸¶å•å·çš„ç·¨è™Ÿæ˜¯å› ç‚ºå•å·ç·¨è™Ÿæ˜¯è‡ªå‹•ç”Ÿæˆçš„æµæ°´è™Ÿ
 
 	@NotBlank(message = ConstantsMessage.QUIZ_NAME_ERROR)
 	private String name;
@@ -29,8 +29,8 @@ public class QuizCreateReq {
 
 	private boolean published;
 
-	// ¦P¤@±i°İ¨÷¥i¯à·|¦³¦h­Ó°İÃD
-	@Valid // ´O®MÅçÃÒ: QuestionVo ¤]¦³¨Ï¥Î Validation ÅçÃÒ¡A©Ò¥H­n¥[¤W @Valid ¤~·|¨Ï¨ä¥Í®Ä
+	// åŒä¸€å¼µå•å·å¯èƒ½æœƒæœ‰å¤šå€‹å•é¡Œ
+	@Valid // åµŒå¥—é©—è­‰: QuestionVo ä¹Ÿæœ‰ä½¿ç”¨ Validation é©—è­‰ï¼Œæ‰€ä»¥è¦åŠ ä¸Š @Valid æ‰æœƒä½¿å…¶ç”Ÿæ•ˆ
 	@NotEmpty(message = ConstantsMessage.QUESTION_VO_ERROR)
 	private List<QuestionVo> questionList;
 
